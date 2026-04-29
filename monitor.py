@@ -396,6 +396,7 @@ class App:
         self.text_filter = ''
         self.tree_mode = False
         self.cursor = 0
+        self.cursor_pid = None
         self.scroll = 0
         self.detail_pid = None
         self.last_refresh = 0.0
@@ -462,6 +463,35 @@ class App:
             sort_procs(ps, self.sort_mode)
         return ps
 
+    def _resolve_cursor(self, ps):
+        if not ps:
+            self.cursor_pid = None
+            return 0
+        if self.cursor_pid is None:
+            self.cursor_pid = ps[0]['pid']
+            return 0
+        for i, p in enumerate(ps):
+            if p['pid'] == self.cursor_pid:
+                return i
+        self.cursor_pid = ps[0]['pid']
+        return 0
+
+    def _move(self, delta):
+        ps = self.filtered()
+        if not ps:
+            self.cursor_pid = None
+            return
+        cur = self._resolve_cursor(ps)
+        new = max(0, min(len(ps) - 1, cur + delta))
+        self.cursor_pid = ps[new]['pid']
+
+    def _jump(self, where):
+        ps = self.filtered()
+        if not ps:
+            self.cursor_pid = None
+            return
+        self.cursor_pid = ps[0 if where == 'home' else -1]['pid']
+
     def draw(self):
         self.stdscr.erase()
         h, w = self.stdscr.getmaxyx()
@@ -492,11 +522,9 @@ class App:
         body_h = max(1, h - 4)
         if not ps:
             self._safe_addstr(body_top, 0, '(no processes match)')
+            self.cursor_pid = None
         else:
-            if self.cursor >= len(ps):
-                self.cursor = len(ps) - 1
-            if self.cursor < 0:
-                self.cursor = 0
+            self.cursor = self._resolve_cursor(ps)
             if self.cursor < self.scroll:
                 self.scroll = self.cursor
             if self.cursor >= self.scroll + body_h:
@@ -619,10 +647,9 @@ class App:
     def selected_proc(self):
         if self.detail_pid is not None:
             return next((x for x in self.procs if x['pid'] == self.detail_pid), None)
-        ps = self.filtered()
-        if 0 <= self.cursor < len(ps):
-            return ps[self.cursor]
-        return None
+        if self.cursor_pid is None:
+            return None
+        return next((p for p in self.filtered() if p['pid'] == self.cursor_pid), None)
 
     def kill_selected(self, sig):
         p = self.selected_proc()
@@ -681,17 +708,17 @@ class App:
             if ch == ord('q'):
                 break
             elif ch in (curses.KEY_UP, ord('k')):
-                self.cursor -= 1
+                self._move(-1)
             elif ch in (curses.KEY_DOWN, ord('j')):
-                self.cursor += 1
+                self._move(1)
             elif ch == curses.KEY_PPAGE:
-                self.cursor -= 20
+                self._move(-20)
             elif ch == curses.KEY_NPAGE:
-                self.cursor += 20
+                self._move(20)
             elif ch == curses.KEY_HOME:
-                self.cursor = 0
+                self._jump('home')
             elif ch == curses.KEY_END:
-                self.cursor = 10 ** 9
+                self._jump('end')
             elif ch == ord('r'):
                 self.refresh()
                 self.set_message('refreshed')
