@@ -383,9 +383,6 @@ def setup_colors():
         i += 1
     curses.init_pair(i, curses.COLOR_BLACK, curses.COLOR_WHITE)
     CAT_COLOR_PAIR['_HEADER'] = curses.color_pair(i) | curses.A_BOLD
-    i += 1
-    curses.init_pair(i, curses.COLOR_WHITE, curses.COLOR_BLUE)
-    CAT_COLOR_PAIR['_SELECTED'] = curses.color_pair(i) | curses.A_BOLD
 
 
 class App:
@@ -486,7 +483,7 @@ class App:
         line = line.ljust(w)[:w]
         attr = CAT_COLOR_PAIR.get(p['category'], 0)
         if selected:
-            attr = CAT_COLOR_PAIR['_SELECTED']
+            attr |= curses.A_REVERSE | curses.A_BOLD
         self._safe_addstr(y, 0, line, attr)
 
     def draw_status(self, h, w):
