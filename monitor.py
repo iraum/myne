@@ -402,22 +402,55 @@ class App:
         self.refresh_interval = 2.0
         self.message = ''
         self.message_until = 0.0
+        self.first_seen = {}
+        self.ghosts = {}
+        self.ghost_ttl = 5.0
+        self.fresh_ttl = 3.0
 
     def set_message(self, msg, dur=3.0):
         self.message = msg
         self.message_until = time.time() + dur
 
     def refresh(self):
+        old = list(self.procs)
+        is_first = not self.first_seen
         try:
             self.procs = self.collector.collect()
         except Exception as e:
             self.set_message(f'collect error: {e}')
+        now = time.time()
+        new_pids = {p['pid'] for p in self.procs}
+        # On first launch, backdate first_seen so existing processes don't all
+        # flash as "fresh" — they predate the tool, not the run.
+        default_first = (now - self.fresh_ttl - 1) if is_first else now
         for p in self.procs:
+            self.first_seen.setdefault(p['pid'], default_first)
             self.library.record(p['comm'])
-        self.last_refresh = time.time()
+        for op in old:
+            if op['pid'] not in new_pids and op['pid'] not in self.ghosts:
+                g = dict(op)
+                g['_ghost_at'] = now
+                self.ghosts[op['pid']] = g
+        cutoff = now - self.ghost_ttl
+        self.ghosts = {pid: g for pid, g in self.ghosts.items() if g['_ghost_at'] > cutoff}
+        alive = new_pids | set(self.ghosts)
+        self.first_seen = {pid: t for pid, t in self.first_seen.items() if pid in alive}
+        self.last_refresh = now
 
     def filtered(self):
-        ps = list(self.procs)
+        now = time.time()
+        ps = []
+        for p in self.procs:
+            q = p
+            if now - self.first_seen.get(p['pid'], now) < self.fresh_ttl:
+                q = dict(p)
+                q['_fresh'] = True
+            ps.append(q)
+        if not self.tree_mode:
+            for g in self.ghosts.values():
+                gp = dict(g)
+                gp['_ghost'] = True
+                ps.append(gp)
         if self.cat_filter:
             ps = [p for p in ps if p['category'] == self.cat_filter]
         if self.text_filter:
@@ -479,15 +512,25 @@ class App:
         depth = p.get('_depth', 0)
         indent = '  ' * depth
         cmd = indent + p['cmdline']
-        line = f' {p["pid"]:>5} {p["user"][:10]:<10} {p["category"]:<9} {p["cpu_pct"]:5.1f} {p["mem_pct"]:5.1f} {p["tty"][:8]:<8} {cmd}'
+        if p.get('_ghost'):
+            marker = '†'
+        elif p.get('_fresh'):
+            marker = '+'
+        else:
+            marker = ' '
+        line = f'{marker}{p["pid"]:>5} {p["user"][:10]:<10} {p["category"]:<9} {p["cpu_pct"]:5.1f} {p["mem_pct"]:5.1f} {p["tty"][:8]:<8} {cmd}'
         line = line.ljust(w)[:w]
         attr = CAT_COLOR_PAIR.get(p['category'], 0)
+        if p.get('_ghost'):
+            attr |= curses.A_DIM
+        elif p.get('_fresh'):
+            attr |= curses.A_BOLD
         if selected:
             attr |= curses.A_REVERSE | curses.A_BOLD
         self._safe_addstr(y, 0, line, attr)
 
     def draw_status(self, h, w):
-        keys = 'jk move  s sort  Tab cat  / search  T tree  Enter detail  K SIGTERM  9 SIGKILL  r refresh  q quit'
+        keys = 'jk move  s sort  Tab cat  / search  T tree  Enter detail  K SIGTERM  9 SIGKILL  +new  †gone  r refresh  q quit'
         if time.time() < self.message_until and self.message:
             line = ' ' + self.message
         else:
