@@ -50,6 +50,19 @@ If any of these change shape, the parser breaks. They're stable across modern ke
 - `/proc/<pid>/cmdline` — NUL-separated; empty for kernel threads and a few exotic userspace daemons.
 - `/proc/stat`, `/proc/meminfo` — for CPU% denominator and total memory.
 
+## Process description library
+
+`library.json` (next to `monitor.py`) maps process `comm` names to short human-written descriptions, displayed in the detail panel as the `About:` line. Two lookup paths:
+
+- **`entries`** — exact-match by `comm` (the 15-char-truncated name from `/proc/<pid>/stat`).
+- **`patterns`** — fnmatch globs evaluated in file order; first match wins. Used for families like `kworker/*`, `gsd-*`, `gvfsd-*`.
+
+Lookup tries `entries` first, then `patterns`. Any `comm` seen at runtime that has no curated entry and no pattern match gets auto-stubbed (`description: null, source: "auto", first_seen: <date>`) and the file is rewritten on exit. Stubs are how we keep a record of "what we've seen but haven't documented" — future curation work is `grep '"description": null' library.json`, research, fill in, set `"source": "curated"`.
+
+When matching, remember `comm` is truncated to 15 chars in `/proc/<pid>/stat`. So the key for `gnome-session-binary` is `gnome-session-b`, not the full name.
+
+`library.json` is committed; the tool rewrites it in place when stubs are added. `git diff library.json` after a run shows what new processes were observed.
+
 ## Conventions
 
 - No external dependencies. Keep it stdlib-only so the script works on a fresh Linux box without `pip`.

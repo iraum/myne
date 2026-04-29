@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 import curses
+import datetime
+import fnmatch
+import json
 import os
 import pwd
 import signal
@@ -265,6 +268,26 @@ def build_tree(procs):
     return out
 
 
+def wrap_text(text, width):
+    if not text:
+        return ['']
+    out = []
+    for paragraph in text.splitlines() or [text]:
+        words = paragraph.split(' ')
+        line = ''
+        for w in words:
+            if not line:
+                line = w
+            elif len(line) + 1 + len(w) <= width:
+                line += ' ' + w
+            else:
+                out.append(line)
+                line = w
+        if line:
+            out.append(line)
+    return out or ['']
+
+
 def parent_chain(procs, pid):
     by_pid = {p['pid']: p for p in procs}
     chain = []
@@ -278,6 +301,60 @@ def parent_chain(procs, pid):
             break
         cur = p['ppid']
     return chain
+
+
+class Library:
+    def __init__(self, path):
+        self.path = path
+        self.entries = {}
+        self.patterns = []
+        self.dirty = False
+        self.load()
+
+    def load(self):
+        try:
+            with open(self.path) as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            data = {}
+        self.entries = data.get('entries', {}) or {}
+        self.patterns = data.get('patterns', []) or []
+
+    def save(self):
+        if not self.dirty:
+            return
+        data = {'version': 1, 'patterns': self.patterns, 'entries': self.entries}
+        tmp = self.path + '.tmp'
+        try:
+            with open(tmp, 'w') as f:
+                json.dump(data, f, indent=2, sort_keys=True)
+                f.write('\n')
+            os.replace(tmp, self.path)
+            self.dirty = False
+        except OSError:
+            pass
+
+    def lookup(self, comm):
+        e = self.entries.get(comm)
+        if e:
+            return e
+        for p in self.patterns:
+            if fnmatch.fnmatchcase(comm, p.get('glob', '')):
+                return p
+        return None
+
+    def record(self, comm):
+        if comm in self.entries:
+            return
+        for p in self.patterns:
+            if fnmatch.fnmatchcase(comm, p.get('glob', '')):
+                return
+        self.entries[comm] = {
+            'description': None,
+            'source': 'auto',
+            'first_seen': datetime.date.today().isoformat(),
+        }
+        self.dirty = True
 
 
 CAT_COLOR_PAIR = {}
@@ -315,6 +392,7 @@ class App:
     def __init__(self, stdscr):
         self.stdscr = stdscr
         self.collector = Collector()
+        self.library = Library(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'library.json'))
         self.procs = []
         self.sort_mode = SORT_CPU
         self.cat_filter = None
@@ -337,6 +415,8 @@ class App:
             self.procs = self.collector.collect()
         except Exception as e:
             self.set_message(f'collect error: {e}')
+        for p in self.procs:
+            self.library.record(p['comm'])
         self.last_refresh = time.time()
 
     def filtered(self):
@@ -424,6 +504,13 @@ class App:
             return
         self._safe_addstr(0, 0, f' detail PID {p["pid"]}'.ljust(w)[:w], CAT_COLOR_PAIR['_HEADER'])
         loginuid_disp = 'unset' if p['loginuid'] == LOGINUID_UNSET else f'{p["loginuid"]} ({uid_name(p["loginuid"])})'
+        lib_entry = self.library.lookup(p['comm'])
+        if lib_entry and lib_entry.get('description'):
+            about = lib_entry['description']
+            about_src = lib_entry.get('glob') or lib_entry.get('source', '')
+        else:
+            about = '(no description yet — added to library; ask Claude to research)'
+            about_src = 'unknown'
         rows = [
             f'PID:       {p["pid"]}',
             f'PPID:      {p["ppid"]}',
@@ -438,8 +525,15 @@ class App:
             f'CPU:       {p["cpu_pct"]:.1f}%',
             f'Cmdline:   {p["cmdline"]}',
             '',
-            'Cgroup:',
         ]
+        wrap_w = max(20, w - 11)
+        about_lines = wrap_text(about, wrap_w)
+        rows.append(f'About:     {about_lines[0] if about_lines else ""}')
+        for cont in about_lines[1:]:
+            rows.append(f'           {cont}')
+        rows.append(f'           [source: {about_src}]')
+        rows.append('')
+        rows.append('Cgroup:')
         for line in p['cgroup'].splitlines():
             rows.append(f'  {line}')
         rows.append('')
@@ -581,7 +675,11 @@ class App:
 
 def main(stdscr):
     setup_colors()
-    App(stdscr).run()
+    app = App(stdscr)
+    try:
+        app.run()
+    finally:
+        app.library.save()
 
 
 if __name__ == '__main__':
