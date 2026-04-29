@@ -89,7 +89,9 @@ def read_stat(pid):
             'comm': comm,
             'state': rest[0],
             'ppid': int(rest[1]),
+            'pgrp': int(rest[2]),
             'tty_nr': int(rest[4]),
+            'tpgid': int(rest[5]),
             'utime': int(rest[11]),
             'stime': int(rest[12]),
             'starttime': int(rest[19]),
@@ -127,6 +129,24 @@ def read_loginuid(pid):
 def read_cgroup(pid):
     data = read_text(f'/proc/{pid}/cgroup')
     return data.strip() if data else ''
+
+
+def read_cwd(pid):
+    try:
+        return os.readlink(f'/proc/{pid}/cwd')
+    except OSError:
+        return None
+
+
+SHELL_COMMS = {'bash', 'zsh', 'sh', 'fish', 'dash', 'ksh', 'tcsh', 'csh', 'mksh'}
+
+
+def abbreviate_home(path, home):
+    if not path:
+        return path
+    if home and (path == home or path.startswith(home + '/')):
+        return '~' + path[len(home):]
+    return path
 
 
 _user_cache = {}
@@ -177,6 +197,10 @@ class Collector:
         self.prev_total = 0
         self.total_mem_kb = total_mem_kb()
         self.my_uid = os.getuid()
+        try:
+            self.home = pwd.getpwuid(self.my_uid).pw_dir or ''
+        except KeyError:
+            self.home = os.environ.get('HOME', '')
 
     def collect(self):
         cur_total = read_total_jiffies()
@@ -216,9 +240,12 @@ class Collector:
             rss_kb = stat['rss_pages'] * PAGE_SIZE // 1024
             mem_pct = rss_kb / self.total_mem_kb * 100 if self.total_mem_kb else 0.0
             cat = categorize(uid, loginuid, has_tty, cgroup, is_kernel, self.my_uid)
+            cwd = abbreviate_home(read_cwd(pid), self.home) if stat['comm'] in SHELL_COMMS else None
             procs.append({
                 'pid': pid,
                 'ppid': stat['ppid'],
+                'pgrp': stat['pgrp'],
+                'tpgid': stat['tpgid'],
                 'comm': stat['comm'],
                 'state': stat['state'],
                 'uid': uid,
@@ -228,6 +255,8 @@ class Collector:
                 'has_tty': has_tty,
                 'cgroup': cgroup,
                 'cmdline': display_cmd,
+                'cwd': cwd,
+                'fg_cmdline': None,
                 'cpu_pct': cpu_pct,
                 'mem_pct': mem_pct,
                 'rss_kb': rss_kb,
@@ -236,6 +265,16 @@ class Collector:
                 'is_kernel': is_kernel,
                 'starttime': stat['starttime'],
             })
+        # Second pass: resolve each shell's foreground job via tpgid (the
+        # foreground process-group id of its controlling TTY). Leader of that
+        # pgrp has pid == pgrp; if it's the shell itself, the shell is idle.
+        by_pgrp_leader = {p['pid']: p for p in procs if p['pid'] == p['pgrp']}
+        for p in procs:
+            if p['comm'] in SHELL_COMMS and p['tpgid'] > 0 and p['tpgid'] != p['pgrp']:
+                fg = by_pgrp_leader.get(p['tpgid'])
+                if fg is not None:
+                    p['fg_cmdline'] = fg['cmdline']
+                    p['fg_pid'] = fg['pid']
         self.prev_proc = new_prev_proc
         self.prev_total = cur_total
         return procs
@@ -561,6 +600,10 @@ class App:
         depth = p.get('_depth', 0)
         indent = '  ' * depth
         cmd = indent + p['cmdline']
+        if p.get('fg_cmdline'):
+            cmd += f'  ▶ {p["fg_cmdline"]}'
+        elif p.get('cwd'):
+            cmd += f'  · {p["cwd"]}'
         if p.get('_ghost'):
             marker = '†'
         elif p.get('_fresh'):
@@ -613,8 +656,12 @@ class App:
             f'RSS:       {p["rss_kb"]:,} KB ({p["mem_pct"]:.1f}%)',
             f'CPU:       {p["cpu_pct"]:.1f}%',
             f'Cmdline:   {p["cmdline"]}',
-            '',
         ]
+        if p.get('cwd'):
+            rows.append(f'Cwd:       {p["cwd"]}')
+        if p.get('fg_cmdline'):
+            rows.append(f'Foreground: pid {p.get("fg_pid","?"):<6}  {p["fg_cmdline"]}')
+        rows.append('')
         wrap_w = max(20, w - 11)
         about_lines = wrap_text(about, wrap_w)
         rows.append(f'About:     {about_lines[0] if about_lines else ""}')
