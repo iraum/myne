@@ -505,7 +505,8 @@ class App:
         my_user = uid_name(self.collector.my_uid)
         bits = [f'mon-itor', f'you: {my_user}({self.collector.my_uid})', f'procs: {len(self.procs)}', f'sort: {self.sort_mode}']
         if self.cat_filter:
-            bits.append(f'cat: {self.cat_filter}')
+            digit = CAT_ORDER.index(self.cat_filter) + 1 if self.cat_filter in CAT_ORDER else '?'
+            bits.append(f'cat: [{digit}]{self.cat_filter}')
         if self.text_filter:
             bits.append(f'/{self.text_filter}')
         if self.tree_mode:
@@ -558,7 +559,7 @@ class App:
         self._safe_addstr(y, 0, line, attr)
 
     def draw_status(self, h, w):
-        keys = 'jk move  s sort  Tab cat  / search  T tree  Enter detail  K SIGTERM  9 SIGKILL  +new  †gone  r refresh  q quit'
+        keys = 'jk move  s sort  1-7/Tab cat (0 clear)  / search  T tree  Enter detail  K SIGTERM  9 SIGKILL  +new  †gone  r refresh  q quit'
         if time.time() < self.message_until and self.message:
             line = ' ' + self.message
         else:
@@ -726,6 +727,13 @@ class App:
                 self.cycle_sort()
             elif ch == ord('\t'):
                 self.cycle_cat()
+            elif ord('0') <= ch <= ord('7'):
+                n = ch - ord('0')
+                if n == 0:
+                    self.cat_filter = None
+                else:
+                    cat = CAT_ORDER[n - 1]
+                    self.cat_filter = None if self.cat_filter == cat else cat
             elif ch == ord('T'):
                 self.tree_mode = not self.tree_mode
             elif ch == ord('/'):
