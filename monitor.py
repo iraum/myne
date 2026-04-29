@@ -407,6 +407,7 @@ class App:
         self.ghosts = {}
         self.ghost_ttl = 5.0
         self.fresh_ttl = 3.0
+        self.hide_kernel = True
 
     def set_message(self, msg, dur=3.0):
         self.message = msg
@@ -454,6 +455,8 @@ class App:
                 ps.append(gp)
         if self.cat_filter:
             ps = [p for p in ps if p['category'] == self.cat_filter]
+        elif self.hide_kernel:
+            ps = [p for p in ps if p['category'] != CAT_KERNEL]
         if self.text_filter:
             t = self.text_filter.lower()
             ps = [p for p in ps if t in p['cmdline'].lower() or t in str(p['pid'])]
@@ -507,6 +510,8 @@ class App:
         if self.cat_filter:
             digit = CAT_ORDER.index(self.cat_filter) + 1 if self.cat_filter in CAT_ORDER else '?'
             bits.append(f'cat: [{digit}]{self.cat_filter}')
+        elif self.hide_kernel:
+            bits.append('cat: -KERNEL (7 to show)')
         if self.text_filter:
             bits.append(f'/{self.text_filter}')
         if self.tree_mode:
