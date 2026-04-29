@@ -685,7 +685,9 @@ class App:
             marker = '+'
         else:
             marker = ' '
-        line = f'{marker}{p["pid"]:>5} {p["user"][:10]:<10} {p["category"]:<9} {p["cpu_pct"]:5.1f} {p["mem_pct"]:5.1f} {p["tty"][:8]:<8} {cmd}'
+        cpu_s = f'{p["cpu_pct"]:5.1f}' if p['cpu_pct'] >= 0.05 else '     '
+        mem_s = f'{p["mem_pct"]:5.1f}' if p['mem_pct'] >= 0.05 else '     '
+        line = f'{marker}{p["pid"]:>5} {p["user"][:10]:<10} {p["category"]:<9} {cpu_s} {mem_s} {p["tty"][:8]:<8} {cmd}'
         line = line.ljust(w)[:w]
         attr = CAT_COLOR_PAIR.get(p['category'], 0)
         if p.get('_ghost'):
