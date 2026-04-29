@@ -63,6 +63,23 @@ When matching, remember `comm` is truncated to 15 chars in `/proc/<pid>/stat`. S
 
 `library.json` is committed; the tool rewrites it in place when stubs are added. `git diff library.json` after a run shows what new processes were observed.
 
+## Cursor tracks the PID, not the row index
+
+`self.cursor_pid` is the source of truth for what's selected; `self.cursor` is recomputed from it every frame in `_resolve_cursor()`. This is what lets the highlight stay glued to a specific process when the list reorders (CPU% changes, sort cycles, filter toggles). If the PID isn't in the visible list (filtered out, or aged past `ghost_ttl`), the cursor falls back to the top row. Ghosts retain their PID, so a just-died process is still selectable for the visibility window — useful when you want to read its detail panel before it disappears.
+
+If you change the navigation handlers, go through `_move(delta)` / `_jump('home'|'end')` — they update `cursor_pid`. Don't poke the index directly or the next refresh will undo you.
+
+## Fresh and ghost markers
+
+Process churn is otherwise invisible between refreshes. The App keeps two pieces of state alongside `self.procs`:
+
+- `first_seen[pid]` — set on first sighting, used to render a bold `+` marker for `fresh_ttl` seconds (default 3.0).
+- `ghosts[pid]` — a snapshot of processes that vanished since the last refresh, drawn dim with a `†` prefix and kept for `ghost_ttl` seconds (default 5.0).
+
+On the **very first refresh** (`is_first = not self.first_seen`), every PID's `first_seen` is back-dated past `fresh_ttl` so existing processes don't all flash as new — only genuinely new ones do. Preserve that guard if you change the priming step.
+
+Ghosts are merged into the filtered list *after* live processes, so they participate in category and text filters but are skipped in tree mode (parent links may be stale). Their cpu/mem values are frozen at last-sample time.
+
 ## Conventions
 
 - No external dependencies. Keep it stdlib-only so the script works on a fresh Linux box without `pip`.
