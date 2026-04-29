@@ -23,6 +23,20 @@ CAT_KERNEL = 'KERNEL'
 
 CAT_ORDER = [CAT_MINE, CAT_MINE_BG, CAT_USER_SVC, CAT_SYSTEM, CAT_ROOT, CAT_OTHER, CAT_KERNEL]
 
+# Filter presets keyed by hotkey digit. 1-7 are single categories matching
+# CAT_ORDER. 8 is the "everything you launched" combo (MINE + MINE-BG) — handy
+# because nohup'd / disowned shell jobs land in MINE-BG, not MINE.
+FILTER_PRESETS = {
+    1: ('MINE',     frozenset({CAT_MINE})),
+    2: ('MINE-BG',  frozenset({CAT_MINE_BG})),
+    3: ('USER-SVC', frozenset({CAT_USER_SVC})),
+    4: ('SYSTEM',   frozenset({CAT_SYSTEM})),
+    5: ('ROOT',     frozenset({CAT_ROOT})),
+    6: ('OTHER',    frozenset({CAT_OTHER})),
+    7: ('KERNEL',   frozenset({CAT_KERNEL})),
+    8: ('YOURS',    frozenset({CAT_MINE, CAT_MINE_BG})),
+}
+
 SORT_CPU = 'cpu'
 SORT_MEM = 'mem'
 SORT_PID = 'pid'
@@ -454,7 +468,8 @@ class App:
                 gp['_ghost'] = True
                 ps.append(gp)
         if self.cat_filter:
-            ps = [p for p in ps if p['category'] == self.cat_filter]
+            cats = FILTER_PRESETS[self.cat_filter][1]
+            ps = [p for p in ps if p['category'] in cats]
         elif self.hide_kernel:
             ps = [p for p in ps if p['category'] != CAT_KERNEL]
         if self.text_filter:
@@ -508,8 +523,8 @@ class App:
         my_user = uid_name(self.collector.my_uid)
         bits = [f'mon-itor', f'you: {my_user}({self.collector.my_uid})', f'procs: {len(self.procs)}', f'sort: {self.sort_mode}']
         if self.cat_filter:
-            digit = CAT_ORDER.index(self.cat_filter) + 1 if self.cat_filter in CAT_ORDER else '?'
-            bits.append(f'cat: [{digit}]{self.cat_filter}')
+            label = FILTER_PRESETS[self.cat_filter][0]
+            bits.append(f'cat: [{self.cat_filter}]{label}')
         elif self.hide_kernel:
             bits.append('cat: -KERNEL (7 to show)')
         if self.text_filter:
@@ -564,7 +579,7 @@ class App:
         self._safe_addstr(y, 0, line, attr)
 
     def draw_status(self, h, w):
-        keys = 'jk move  s sort  1-7/Tab cat (0 clear)  / search  T tree  Enter detail  K SIGTERM  9 SIGKILL  +new  †gone  r refresh  q quit'
+        keys = 'jk move  s sort  1-8/Tab cat (0 clear, 8=YOURS)  / search  T tree  Enter detail  K SIGTERM  9 SIGKILL  r refresh  q quit'
         if time.time() < self.message_until and self.message:
             line = ' ' + self.message
         else:
@@ -680,7 +695,7 @@ class App:
         self.sort_mode = SORT_ORDER[(i + 1) % len(SORT_ORDER)]
 
     def cycle_cat(self):
-        opts = [None] + CAT_ORDER
+        opts = [None] + sorted(FILTER_PRESETS)
         i = opts.index(self.cat_filter) if self.cat_filter in opts else 0
         self.cat_filter = opts[(i + 1) % len(opts)]
 
@@ -732,13 +747,12 @@ class App:
                 self.cycle_sort()
             elif ch == ord('\t'):
                 self.cycle_cat()
-            elif ord('0') <= ch <= ord('7'):
+            elif ord('0') <= ch <= ord('8'):
                 n = ch - ord('0')
                 if n == 0:
                     self.cat_filter = None
-                else:
-                    cat = CAT_ORDER[n - 1]
-                    self.cat_filter = None if self.cat_filter == cat else cat
+                elif n in FILTER_PRESETS:
+                    self.cat_filter = None if self.cat_filter == n else n
             elif ch == ord('T'):
                 self.tree_mode = not self.tree_mode
             elif ch == ord('/'):
