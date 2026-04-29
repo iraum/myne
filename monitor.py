@@ -151,6 +151,11 @@ SHELL_COMMS = {'bash', 'zsh', 'sh', 'fish', 'dash', 'ksh', 'tcsh', 'csh', 'mksh'
 
 UNIT_SUFFIXES = ('.service', '.scope', '.socket', '.target', '.timer', '.path', '.mount')
 
+# Unit names that always carry zero signal: gnome-terminal tab scopes,
+# logind session scopes, generic GNOME app scopes, and the catch-all init.scope.
+NOISY_UNIT_PREFIXES = ('vte-spawn-', 'session-', 'app-')
+NOISY_UNITS = {'init.scope'}
+
 # Container scope segments emitted by container runtimes inside cgroup paths.
 _CONTAINER_RE = re.compile(r'(?:libpod|libcrun|crun|docker|runc|cri-containerd)[-:]([0-9a-f]{12,})')
 _BARE_CONTAINER_RE = re.compile(r'/([0-9a-f]{32,})(?:[/.]|$)')
@@ -184,6 +189,14 @@ def is_unit_redundant_with_comm(unit, comm):
     if not base or not comm:
         return False
     return base == comm or base.startswith(comm) or comm.startswith(base)
+
+
+def is_noisy_unit(unit):
+    if not unit:
+        return False
+    if unit in NOISY_UNITS or unit.endswith('.slice'):
+        return True
+    return any(unit.startswith(p) for p in NOISY_UNIT_PREFIXES)
 
 
 def abbreviate_home(path, home):
@@ -291,7 +304,7 @@ class Collector:
             else:
                 unit = parse_systemd_unit(cgroup)
                 container_id = parse_container_id(cgroup)
-                if unit and is_unit_redundant_with_comm(unit, stat['comm']):
+                if unit and (is_unit_redundant_with_comm(unit, stat['comm']) or is_noisy_unit(unit)):
                     unit = None
             wchan = read_wchan(pid) if stat['state'] == 'D' else None
             procs.append({

@@ -60,7 +60,7 @@ The cmdline alone is rarely enough — `bash` doesn't say where it is, `agent` d
 2. **`▶ <fg cmdline>`** for shells with a foreground job (resolved via `tpgid` → leader of that pgrp).
 3. **`· <cwd>`** for idle shells.
 4. **`[container:<id12>]`** when `cgroup` matches a container scope (`libpod-`, `crun-`, `docker-`, or a bare 32+ hex segment). 12-char short id.
-5. **`[unit:<name>]`** for the deepest systemd unit (`.service`/`.scope`/`.target`/...) in the cgroup path, *unless* the unit name is redundant with `comm` (e.g. `sshd` in `sshd.service` is suppressed; `python3` in `oracle-cloud-agent.service` is shown). See `is_unit_redundant_with_comm`.
+5. **`[unit:<name>]`** for the deepest systemd unit (`.service`/`.scope`/`.target`/...) in the cgroup path, *unless* it's redundant with `comm` (e.g. `sshd` in `sshd.service`) *or* matches a noise pattern — `vte-spawn-*` (gnome-terminal tabs), `session-*.scope`, `app-*.scope`, `init.scope`, or any `*.slice`. See `is_unit_redundant_with_comm` and `is_noisy_unit`. Without the noise filter, MINE rows get drowned in vte-spawn UUIDs.
 
 The detail panel shows all that apply, not just the winning one.
 
