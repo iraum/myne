@@ -5,6 +5,7 @@ import fnmatch
 import json
 import os
 import pwd
+import re
 import signal
 import time
 
@@ -138,7 +139,51 @@ def read_cwd(pid):
         return None
 
 
+def read_wchan(pid):
+    data = read_text(f'/proc/{pid}/wchan')
+    if not data:
+        return None
+    s = data.strip()
+    return s if s and s != '0' else None
+
+
 SHELL_COMMS = {'bash', 'zsh', 'sh', 'fish', 'dash', 'ksh', 'tcsh', 'csh', 'mksh'}
+
+UNIT_SUFFIXES = ('.service', '.scope', '.socket', '.target', '.timer', '.path', '.mount')
+
+# Container scope segments emitted by container runtimes inside cgroup paths.
+_CONTAINER_RE = re.compile(r'(?:libpod|libcrun|crun|docker|runc|cri-containerd)[-:]([0-9a-f]{12,})')
+_BARE_CONTAINER_RE = re.compile(r'/([0-9a-f]{32,})(?:[/.]|$)')
+
+
+def parse_systemd_unit(cgroup):
+    if not cgroup:
+        return None
+    for line in cgroup.splitlines():
+        path = line.rsplit(':', 1)[-1] if ':' in line else line
+        for seg in reversed([s for s in path.split('/') if s]):
+            if seg.endswith(UNIT_SUFFIXES):
+                return seg
+    return None
+
+
+def parse_container_id(cgroup):
+    if not cgroup:
+        return None
+    for line in cgroup.splitlines():
+        m = _CONTAINER_RE.search(line) or _BARE_CONTAINER_RE.search(line)
+        if m:
+            return m.group(1)[:12]
+    return None
+
+
+def is_unit_redundant_with_comm(unit, comm):
+    # Strip .service/.scope/.target etc. and any @instance from the unit base,
+    # then compare with the (possibly 15-char-truncated) comm.
+    base = unit.rsplit('.', 1)[0].split('@', 1)[0]
+    if not base or not comm:
+        return False
+    return base == comm or base.startswith(comm) or comm.startswith(base)
 
 
 def abbreviate_home(path, home):
@@ -241,6 +286,14 @@ class Collector:
             mem_pct = rss_kb / self.total_mem_kb * 100 if self.total_mem_kb else 0.0
             cat = categorize(uid, loginuid, has_tty, cgroup, is_kernel, self.my_uid)
             cwd = abbreviate_home(read_cwd(pid), self.home) if stat['comm'] in SHELL_COMMS else None
+            if is_kernel:
+                unit = container_id = None
+            else:
+                unit = parse_systemd_unit(cgroup)
+                container_id = parse_container_id(cgroup)
+                if unit and is_unit_redundant_with_comm(unit, stat['comm']):
+                    unit = None
+            wchan = read_wchan(pid) if stat['state'] == 'D' else None
             procs.append({
                 'pid': pid,
                 'ppid': stat['ppid'],
@@ -257,6 +310,9 @@ class Collector:
                 'cmdline': display_cmd,
                 'cwd': cwd,
                 'fg_cmdline': None,
+                'systemd_unit': unit,
+                'container_id': container_id,
+                'wchan': wchan,
                 'cpu_pct': cpu_pct,
                 'mem_pct': mem_pct,
                 'rss_kb': rss_kb,
@@ -600,10 +656,16 @@ class App:
         depth = p.get('_depth', 0)
         indent = '  ' * depth
         cmd = indent + p['cmdline']
-        if p.get('fg_cmdline'):
+        if p.get('wchan'):
+            cmd += f'  [wchan:{p["wchan"]}]'
+        elif p.get('fg_cmdline'):
             cmd += f'  ▶ {p["fg_cmdline"]}'
         elif p.get('cwd'):
             cmd += f'  · {p["cwd"]}'
+        elif p.get('container_id'):
+            cmd += f'  [container:{p["container_id"]}]'
+        elif p.get('systemd_unit'):
+            cmd += f'  [unit:{p["systemd_unit"]}]'
         if p.get('_ghost'):
             marker = '†'
         elif p.get('_fresh'):
@@ -661,6 +723,12 @@ class App:
             rows.append(f'Cwd:       {p["cwd"]}')
         if p.get('fg_cmdline'):
             rows.append(f'Foreground: pid {p.get("fg_pid","?"):<6}  {p["fg_cmdline"]}')
+        if p.get('systemd_unit'):
+            rows.append(f'Unit:      {p["systemd_unit"]}')
+        if p.get('container_id'):
+            rows.append(f'Container: {p["container_id"]}')
+        if p.get('wchan'):
+            rows.append(f'Wchan:     {p["wchan"]}  (uninterruptible sleep — usually I/O wait)')
         rows.append('')
         wrap_w = max(20, w - 11)
         about_lines = wrap_text(about, wrap_w)

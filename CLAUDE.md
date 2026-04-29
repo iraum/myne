@@ -48,7 +48,21 @@ If any of these change shape, the parser breaks. They're stable across modern ke
 - `/proc/<pid>/loginuid` — single integer; `4294967295` means unset.
 - `/proc/<pid>/cgroup` — substring-matched for `system.slice`; do not assume a particular cgroup hierarchy version.
 - `/proc/<pid>/cmdline` — NUL-separated; empty for kernel threads and a few exotic userspace daemons.
+- `/proc/<pid>/cwd` — symlink, read with `os.readlink`; only fetched for processes whose `comm` is in `SHELL_COMMS`.
+- `/proc/<pid>/wchan` — kernel function name the task is sleeping in; only fetched when `state == 'D'` (uninterruptible sleep — usually disk I/O).
 - `/proc/stat`, `/proc/meminfo` — for CPU% denominator and total memory.
+
+## COMMAND-column enrichment
+
+The cmdline alone is rarely enough — `bash` doesn't say where it is, `agent` doesn't say it's the OCI agent. The row appends one annotation chosen by priority (first match wins, so the row stays one-line):
+
+1. **`[wchan:<fn>]`** when the process is in D-state. Almost always a stuck I/O — the kernel function names what it's blocked on.
+2. **`▶ <fg cmdline>`** for shells with a foreground job (resolved via `tpgid` → leader of that pgrp).
+3. **`· <cwd>`** for idle shells.
+4. **`[container:<id12>]`** when `cgroup` matches a container scope (`libpod-`, `crun-`, `docker-`, or a bare 32+ hex segment). 12-char short id.
+5. **`[unit:<name>]`** for the deepest systemd unit (`.service`/`.scope`/`.target`/...) in the cgroup path, *unless* the unit name is redundant with `comm` (e.g. `sshd` in `sshd.service` is suppressed; `python3` in `oracle-cloud-agent.service` is shown). See `is_unit_redundant_with_comm`.
+
+The detail panel shows all that apply, not just the winning one.
 
 ## Process description library
 
