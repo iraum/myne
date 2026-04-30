@@ -629,7 +629,7 @@ class App:
 
     def draw_header(self, h, w):
         my_user = uid_name(self.collector.my_uid)
-        bits = [f'mon-itor', f'you: {my_user}({self.collector.my_uid})', f'procs: {len(self.procs)}', f'sort: {self.sort_mode}']
+        bits = [f'myne', f'you: {my_user}({self.collector.my_uid})', f'procs: {len(self.procs)}', f'sort: {self.sort_mode}']
         if self.cat_filter:
             label = FILTER_PRESETS[self.cat_filter][0]
             bits.append(f'cat: [{self.cat_filter}]{label}')

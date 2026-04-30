@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A single-file curses TUI (`monitor.py`) that lists Linux processes and lets the user kill them. Python 3, stdlib only — no dependencies, no build step, no test suite.
+**myne** — a single-file curses TUI (`myne.py`) that lists Linux processes and lets the user kill them. Python 3, stdlib only — no dependencies, no build step, no test suite.
+
+The name comes from the central question the tool answers: "is this **mine**?" — answered correctly even for nohup'd / disowned / sudo'd processes via `/proc/<pid>/loginuid` (see below).
 
 ## Run
 
 ```
-./monitor.py        # or: python3 monitor.py
+./myne.py        # or: python3 myne.py
 ```
 
 Linux only. Reads `/proc` directly; no `psutil`, no shelling out to `ps`.
@@ -24,7 +26,7 @@ If you change the categorization logic, preserve this: TTY presence only disting
 
 ## Category taxonomy
 
-Buckets are decided in this fixed order (`categorize()` in `monitor.py`). Order matters — earlier rules win:
+Buckets are decided in this fixed order (`categorize()` in `myne.py`). Order matters — earlier rules win:
 
 1. **KERNEL** — `pid == 2` (kthreadd) or `ppid == 2`. Detected structurally, not by empty cmdline (some daemons clear argv).
 2. **SYSTEM** — cgroup contains `system.slice`. A root-owned daemon under `system.slice` is `SYSTEM`, not `ROOT`.
@@ -66,7 +68,7 @@ The detail panel shows all that apply, not just the winning one.
 
 ## Process description library
 
-`library.json` (next to `monitor.py`) maps process `comm` names to short human-written descriptions, displayed in the detail panel as the `About:` line. Two lookup paths:
+`library.json` (next to `myne.py`) maps process `comm` names to short human-written descriptions, displayed in the detail panel as the `About:` line. Two lookup paths:
 
 - **`entries`** — exact-match by `comm` (the 15-char-truncated name from `/proc/<pid>/stat`).
 - **`patterns`** — fnmatch globs evaluated in file order; first match wins. Used for families like `kworker/*`, `gsd-*`, `gvfsd-*`.
