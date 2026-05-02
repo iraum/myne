@@ -1,140 +1,588 @@
 {
-  "version": 1,
-  "patterns": [
-    {"glob": "kworker/*", "description": "Kernel workqueue thread — runs deferred work for some kernel subsystem (the suffix names it: e.g. -events, -xfs-sync, -kblockd). Created and destroyed by the kernel as needed; presence is normal."},
-    {"glob": "ksoftirqd/*", "description": "Per-CPU softirq handler. Runs network/timer/RCU softirqs that overflowed the interrupt context. One per CPU. Heavy CPU here means the system is taking a lot of soft interrupts."},
-    {"glob": "migration/*", "description": "Per-CPU stop-machine helper used to migrate tasks between CPUs and run synchronization fences. One per CPU. Should sit at 0% almost always."},
-    {"glob": "cpuhp/*", "description": "Per-CPU CPU hot-plug coordinator. Drives the bring-up and tear-down of a logical CPU. Idle on stable systems."},
-    {"glob": "idle_inject/*", "description": "Per-CPU idle-injection thread. Used by thermal throttling to force CPUs idle when they get too hot."},
-    {"glob": "irq/*", "description": "Threaded interrupt handler — the kernel runs the bottom half of an IRQ in this thread. Suffix names the device or driver (e.g. irq/9-acpi, irq/24-aerdrv for PCIe AER)."},
-    {"glob": "rcu_*", "description": "Read-Copy-Update machinery. Reclaims memory freed by RCU readers. Multiple variants exist (preempt, tasks, exp_gp, ...). Idle most of the time; load here usually means heavy RCU usage in some subsystem."},
-    {"glob": "scsi_eh_*", "description": "Per-SCSI-host error handler thread. Sits idle until a command times out or fails; activity here usually means a flaky disk."},
-    {"glob": "xfsaild/*", "description": "XFS Active Item List Daemon — flushes XFS journal items to disk for the named device. One per mounted XFS filesystem."},
-    {"glob": "jbd2/*", "description": "Journaling Block Device v2 — handles ext4 (and ocfs2) journal commits for the named device."},
-    {"glob": "bnx2i_thread/*", "description": "Broadcom NetXtreme II iSCSI offload helper thread. Only relevant on systems using bnx2i hardware iSCSI; otherwise idle."},
-    {"glob": "gsd-*", "description": "GNOME Settings Daemon helper. Each gsd-* binary handles one slice of desktop configuration (color, power, keyboard, media-keys, etc.). Started by the user's GNOME session."},
-    {"glob": "gvfsd-*", "description": "GNOME Virtual Filesystem backend. Implements pseudo-filesystems exposed to apps over D-Bus (network shares, trash, metadata, dnssd, etc.)."},
-    {"glob": "gvfs-*", "description": "GNOME VFS volume monitor — watches a class of removable/online storage (udisks2, mtp, gphoto2, goa) and surfaces it to the file manager."},
-    {"glob": "ibus-*", "description": "IBus input method framework. Handles non-Latin / CJK / IME text input; ibus-daemon orchestrates engines (ibus-engine-*) and the X11/portal bridges."},
-    {"glob": "xdg-*", "description": "XDG desktop portal — D-Bus interface that lets sandboxed apps (Flatpak, Snap) request host capabilities (file access, screenshots, notifications) under user consent."},
-    {"glob": "evolution-*", "description": "GNOME Evolution data server component. Backs calendars, address books, alarms, and account sources for Evolution and any GNOME app that consumes them."},
-    {"glob": "pmda*", "description": "Performance Co-Pilot Metric Domain Agent. Each pmda* exports metrics from one subsystem (linux, kvm, xfs, proc, root, dm) to pmcd for collection."}
-  ],
   "entries": {
-    "systemd": {"description": "PID 1 init system; manages services, mounts, sockets, login sessions, and the boot/shutdown lifecycle. Also runs as 'systemd --user' for per-user service management.", "source": "curated"},
-    "systemd-journal": {"description": "systemd-journald — collects logs from the kernel, syslog, and all services into the structured systemd journal. Read with journalctl.", "source": "curated"},
-    "systemd-logind": {"description": "Tracks user logins and seats; manages session lifecycles, idle/lock state, and inhibitor locks (e.g. 'don't suspend during update').", "source": "curated"},
-    "systemd-udevd": {"description": "Device manager — listens for kernel uevents and applies udev rules to create /dev nodes, set perms, load firmware, and run device-add hooks.", "source": "curated"},
-    "systemd-hostnam": {"description": "systemd-hostnamed — D-Bus service that exposes/changes the hostname. Activated on demand; should be idle.", "source": "curated"},
-    "(sd-pam)": {"description": "Helper thread of 'systemd --user' that holds the PAM session open for your login. Normal; one per user session. Killing it logs you out.", "source": "curated"},
-    "agetty": {"description": "Getty for a virtual console — runs login prompts on tty1..tty6. One per active VT. Safe to leave alone.", "source": "curated"},
-    "sshd": {"description": "OpenSSH daemon. The system-level instance listens for incoming SSH; a per-connection child handles each session and is owned by the connecting user.", "source": "curated"},
-    "ssh-agent": {"description": "Caches your decrypted SSH private keys for the session, so you aren't prompted for the passphrase on every git/ssh.", "source": "curated"},
-    "NetworkManager": {"description": "Primary network configuration daemon — manages wired/wifi/VPN connections via the kernel and wpa_supplicant.", "source": "curated"},
-    "nm-dispatcher": {"description": "NetworkManager dispatcher — runs hook scripts in /etc/NetworkManager/dispatcher.d on connection events. Mostly idle.", "source": "curated"},
-    "wpa_supplicant": {"description": "Implements WPA/WPA2/WPA3 authentication for wifi (and sometimes wired 802.1X). Driven by NetworkManager.", "source": "curated"},
-    "ModemManager": {"description": "Manages mobile broadband modems (USB dongles, embedded WWAN). Idle on systems without one but loaded by default.", "source": "curated"},
-    "chronyd": {"description": "NTP time-sync daemon (chrony). Usually replaces ntpd on modern RHEL/Oracle Linux. Should report tiny drift.", "source": "curated"},
-    "crond": {"description": "cron — runs scheduled jobs from /etc/cron* and per-user crontabs.", "source": "curated"},
-    "atd": {"description": "at(1) daemon — runs one-shot jobs scheduled with `at`. Idle if you don't use it.", "source": "curated"},
-    "auditd": {"description": "Linux audit daemon — receives audit events from the kernel and writes them to /var/log/audit. Required by SELinux/audit rules.", "source": "curated"},
-    "sedispatch": {"description": "SELinux audit-dispatch — forwards SELinux AVC denials from auditd to setroubleshoot for human-readable analysis.", "source": "curated"},
-    "rsyslogd": {"description": "Classic syslog daemon. On systemd systems often coexists with journald, taking input from /dev/log or imjournal.", "source": "curated"},
-    "dbus-broker": {"description": "High-performance D-Bus message broker (replaces the older dbus-daemon). One instance for the system bus and one per user session.", "source": "curated"},
-    "dbus-broker-lau": {"description": "dbus-broker-launch — sets up the bus environment and launches dbus-broker. Sits as the broker's parent.", "source": "curated"},
-    "polkitd": {"description": "PolicyKit daemon — gatekeeper for privileged operations requested over D-Bus (e.g. systemctl, GNOME settings). Decides whether to prompt for auth.", "source": "curated"},
-    "accounts-daemon": {"description": "AccountsService — exposes user account metadata (name, picture, last login) over D-Bus to the login screen and session.", "source": "curated"},
-    "rtkit-daemon": {"description": "RealtimeKit — grants real-time scheduling to client processes (PipeWire, PulseAudio) under policy limits.", "source": "curated"},
-    "avahi-daemon": {"description": "Zeroconf / mDNS / DNS-SD — advertises and discovers services (printers, file shares) on the local network.", "source": "curated"},
-    "cupsd": {"description": "CUPS — the system print server. Holds the printer list and the print spooler.", "source": "curated"},
-    "colord": {"description": "Color management daemon — stores ICC profiles for monitors/printers and serves them to apps.", "source": "curated"},
-    "fwupd": {"description": "Firmware update daemon (LVFS). Discovers BIOS/SSD/NIC firmware updates and stages them; activated on demand by GNOME Software / fwupdmgr.", "source": "curated"},
-    "udisksd": {"description": "Storage device management over D-Bus — mount/unmount/format removable disks, manage partitions. Backs file-manager mount actions.", "source": "curated"},
-    "upowerd": {"description": "Power and battery info via D-Bus. Feeds laptop battery indicators and triggers low-power events.", "source": "curated"},
-    "firewalld": {"description": "Dynamic firewall daemon — manages nftables/iptables rules with zones. The standard firewall on RHEL/Oracle Linux.", "source": "curated"},
-    "irqbalance": {"description": "Distributes hardware interrupt affinity across CPUs to spread load. Adjusts /proc/irq/*/smp_affinity over time.", "source": "curated"},
-    "iscsid": {"description": "open-iscsi initiator daemon — maintains iSCSI sessions to remote storage targets.", "source": "curated"},
-    "lsmd": {"description": "libstoragemgmt daemon — vendor-neutral API for managing storage arrays (HBAs, SAN). Idle unless lsmcli is used.", "source": "curated"},
-    "gssproxy": {"description": "GSSAPI proxy — performs Kerberos credential operations on behalf of services like NFS, isolating keytabs.", "source": "curated"},
-    "rpcbind": {"description": "RPC port mapper. Tells RPC clients (notably NFS) what port a given RPC program is listening on. Only useful if you use NFS / NIS.", "source": "curated"},
-    "sssd_kcm": {"description": "SSSD's Kerberos Credential Manager — stores Kerberos tickets in a centralized cache instead of per-process files.", "source": "curated"},
-    "tuned": {"description": "Dynamic system tuning daemon — applies a profile (throughput-performance, balanced, latency-performance) that adjusts CPU/IO/network knobs.", "source": "curated"},
-    "tuned-ppd": {"description": "tuned's power-profiles-daemon shim — exposes a power-profiles-daemon-compatible D-Bus API on top of tuned.", "source": "curated"},
-    "fluentd": {"description": "Open-source log collector / forwarder. Tails files or sockets and ships log records to backends. On Oracle Linux often part of the OCI Logging Analytics agent.", "source": "curated"},
-    "ollama": {"description": "Local LLM runtime — serves models like Llama / Mistral over an HTTP API on localhost:11434.", "source": "curated"},
-    "osqueryd": {"description": "osquery daemon (Meta open-source) — exposes OS state as SQL tables and runs scheduled queries. Often deployed for fleet visibility / EDR.", "source": "curated"},
-    "dtprobed": {"description": "DTrace probe enumeration daemon — registers USDT probes from running binaries with the DTrace kernel module. Oracle Linux's DTrace stack.", "source": "curated"},
-    "falcond": {"description": "CrowdStrike Falcon EDR sensor — endpoint detection & response agent. Sends telemetry to CrowdStrike cloud and applies prevention policy.", "source": "curated"},
-    "falcon-sensor-b": {"description": "CrowdStrike Falcon sensor BPF helper — falcon-sensor-bpf, used for kernel-level event collection via eBPF.", "source": "curated"},
-    "pmcd": {"description": "Performance Co-Pilot collector daemon — runs PMDAs and exposes metrics over the network for pmlogger / pmie / pminfo.", "source": "curated"},
-    "pmie": {"description": "Performance Co-Pilot inference engine — evaluates rule-based alerts over PCP metrics.", "source": "curated"},
-    "pmlogger": {"description": "Performance Co-Pilot metric logger — periodically samples PCP metrics into archive files for later replay.", "source": "curated"},
-    "pmpause": {"description": "PCP archive helper — invoked by pmlogger to atomically pause/rotate archives.", "source": "curated"},
-    "postmaster": {"description": "PostgreSQL primary server process. Each per-connection backend is a child of postmaster. Multiple postmasters means multiple PG clusters.", "source": "curated"},
-    "ruby": {"description": "Ruby interpreter — check Cmdline for the actual script. On this system frequently used by Performance Co-Pilot's pmrep tooling.", "source": "curated"},
-    "python3": {"description": "CPython 3 interpreter. The PID alone doesn't tell you what it's doing — check Cmdline for the script being run.", "source": "curated"},
-    "node": {"description": "Node.js runtime. Inspect Cmdline for the entry script (could be a dev server, electron app helper, language server, etc.).", "source": "curated"},
-    "bash": {"description": "GNU Bash shell. Interactive instances belong to MINE; long-running ones with no TTY are usually wrappers around a backgrounded command (check Cmdline).", "source": "curated"},
-    "sleep": {"description": "/usr/bin/sleep — pauses for N seconds. If long-lived and detached, it's almost always part of a shell loop or a 'wait' in a script.", "source": "curated"},
-    "claude": {"description": "Claude Code CLI — Anthropic's terminal coding assistant.", "source": "curated"},
-    "esbuild": {"description": "Fast JS/TS bundler written in Go. Usually spawned by a Node dev server or bundler (Vite, tsup) as a long-lived child.", "source": "curated"},
-    "conmon": {"description": "Container monitor (Podman/CRI-O). Supervises one container's main process: reaps it, pipes stdout/stderr, and exposes an attach socket. One per running container.", "source": "curated"},
-    "catatonit": {"description": "Tiny init process used as PID 1 inside Podman containers — reaps zombies and forwards signals. Seeing it on the host means you're looking through into a container's process tree.", "source": "curated"},
-    "entrypoint": {"description": "Generic name — a binary the container image declared as ENTRYPOINT. Identify by Cmdline and parent (usually conmon/catatonit).", "source": "curated"},
-    "vncsession": {"description": "TigerVNC vncsession — launched by the vncserver@ systemd unit; sets up the user environment and execs Xvnc for that display.", "source": "curated"},
-    "Xvnc": {"description": "TigerVNC X server — serves an X11 display over the VNC protocol. One per active VNC display (:1, :2, ...).", "source": "curated"},
-    "xinit": {"description": "Starts an X server and a single client (typically a session manager). Used here to bring up the GNOME session inside the VNC X server.", "source": "curated"},
-    "gnome-shell": {"description": "GNOME Shell — the desktop's window manager + UI, written as a Mutter plugin. CPU/RAM hog if extensions misbehave.", "source": "curated"},
-    "gnome-session-b": {"description": "gnome-session-binary — orchestrates startup of all GNOME components (shell, panels, daemons) for a login session.", "source": "curated"},
-    "gnome-session-c": {"description": "gnome-session-ctl / -checkpoint — helper invoked by gnome-session-binary at session boundaries.", "source": "curated"},
-    "gnome-terminal-": {"description": "gnome-terminal-server — a single process backs all gnome-terminal windows/tabs in your session.", "source": "curated"},
-    "gnome-keyring-d": {"description": "gnome-keyring-daemon — stores passwords, SSH keys, and PKCS#11 secrets, unlocked by your login.", "source": "curated"},
-    "gnome-software": {"description": "GNOME Software — the GUI app store/updater. Usually idle but periodically wakes to refresh package metadata.", "source": "curated"},
-    "gnome-shell-cal": {"description": "gnome-shell-calendar-server — fetches calendar events from Evolution data server for the shell's clock/calendar widget.", "source": "curated"},
-    "nautilus": {"description": "GNOME Files — the desktop file manager. Also draws the desktop icons in older configurations.", "source": "curated"},
-    "pipewire": {"description": "Modern audio/video routing daemon. Replaces PulseAudio + JACK; one per user.", "source": "curated"},
-    "pipewire-pulse": {"description": "PulseAudio compatibility layer for PipeWire — speaks the PA protocol so legacy apps still work.", "source": "curated"},
-    "wireplumber": {"description": "PipeWire session and policy manager — decides routing, default sinks, device priorities.", "source": "curated"},
-    "p11-kit-server": {"description": "PKCS#11 (smart card / HSM) bus server — lets multiple apps share access to crypto tokens.", "source": "curated"},
-    "dconf-service": {"description": "dconf backend — serves GNOME's binary settings database. Activated on first read; should be cheap.", "source": "curated"},
-    "at-spi-bus-laun": {"description": "at-spi-bus-launcher — starts the accessibility (AT-SPI) D-Bus instance.", "source": "curated"},
-    "at-spi2-registr": {"description": "at-spi2-registryd — registers accessible apps so screen readers (Orca) can introspect the UI.", "source": "curated"},
-    "gjs": {"description": "GNOME JavaScript runtime (SpiderMonkey). Used by GNOME Shell extensions and some desktop tools.", "source": "curated"},
-    "goa-daemon": {"description": "GNOME Online Accounts — central D-Bus service holding credentials for accounts (Google, Nextcloud, IMAP) shared across GNOME apps.", "source": "curated"},
-    "goa-identity-se": {"description": "goa-identity-service — companion to goa-daemon, manages enterprise identities (Kerberos / IPA).", "source": "curated"},
-    "fusermount": {"description": "Helper that mounts FUSE filesystems on behalf of unprivileged users. Brief invocation; long-lived ones are unusual.", "source": "curated"},
-    "flatpak-session": {"description": "flatpak-session-helper — runs autostart hooks and exposes host capabilities to Flatpak apps in your session.", "source": "curated"},
-    "ibus-daemon": {"description": "IBus bus daemon — coordinates input-method engines and x11/portal bridges.", "source": "curated"},
-    "ibus-engine-sim": {"description": "ibus-engine-simple — fallback IBus engine that handles compose-key sequences.", "source": "curated"},
-    "ibus-x11": {"description": "ibus-x11 — bridges IBus to X11 client apps that don't speak the IBus protocol natively.", "source": "curated"},
-    "ibus-portal": {"description": "ibus-portal — D-Bus portal so sandboxed (Flatpak) apps can use IBus.", "source": "curated"},
-    "ibus-dconf": {"description": "ibus-dconf — exposes IBus settings stored in dconf.", "source": "curated"},
-    "ibus-extension-": {"description": "ibus-extension-gtk3 — GTK3 helper that handles IBus preedit popups and language switchers.", "source": "curated"},
-    "xdg-desktop-por": {"description": "xdg-desktop-portal — main XDG portal: file chooser, screenshot, notification, etc., on behalf of sandboxed apps. Backends (-gnome, -gtk) implement the UI.", "source": "curated"},
-    "xdg-document-po": {"description": "xdg-document-portal — exposes a per-app FUSE mount in /run/user/UID/doc so sandboxed apps can access user-selected files without filesystem access.", "source": "curated"},
-    "xdg-permission-": {"description": "xdg-permission-store — persists per-app permission decisions (\"always allow camera for X\") for the portals.", "source": "curated"},
-    "oci-falcon": {"description": "Oracle Cloud Infrastructure agent plugin — Falcon, gathers compute metrics for the OCI Monitoring service. Part of oracle-cloud-agent.", "source": "curated"},
-    "oci-fams": {"description": "Oracle Cloud Infrastructure agent plugin — FAMS (Fleet Application Management Service) for patching and lifecycle ops.", "source": "curated"},
-    "oci-wlp": {"description": "Oracle Cloud Infrastructure agent plugin — WLP (WebLogic Plugin) integration; only relevant if you use Oracle WebLogic on this host.", "source": "curated"},
-    "wlp-agent.ext": {"description": "Oracle Cloud Agent's WebLogic plugin extension binary, spawned by oci-wlp.", "source": "curated"},
-    "gomon": {"description": "Oracle Cloud Agent's Go-based monitoring binary, harvesting host metrics for the OCI Monitoring service.", "source": "curated"},
-    "agent": {"description": "Generic name — on this Oracle Linux host it's the main Oracle Cloud Agent binary (under oracle-cloud-agent). Verify via Cmdline / parent chain.", "source": "curated"},
-    "runcommand": {"description": "Oracle Cloud Agent plugin that executes commands sent through OCI Run Command. Idle until a job arrives.", "source": "curated"},
-    "updater": {"description": "Oracle Cloud Agent self-updater — checks for and applies new agent versions.", "source": "curated"},
-    "unifiedmonitori": {"description": "unifiedmonitoringagent — Oracle's unified monitoring agent (often Fluentd-based) that ships logs and metrics from this host to OCI services.", "source": "curated"},
-    "sudo": {"description": "sudo — running an authorized command as another user (usually root). The Cmdline reveals what's actually being executed.", "source": "curated"},
-    "fusermount3": {"description": "FUSE mount helper (FUSE 3 variant). Same role as fusermount.", "source": "curated"},
-    "kthreadd": {"description": "Kernel thread daemon (PID 2) — parent of every kernel thread. The kernel asks it to spawn new threads.", "source": "curated"},
-    "kswapd0": {"description": "Kernel swap daemon — pages anonymous memory out to swap when free memory falls below a watermark. One per NUMA node.", "source": "curated"},
-    "kcompactd0": {"description": "Kernel memory compaction daemon — defragments physical memory so larger contiguous allocations succeed.", "source": "curated"},
-    "ksmd": {"description": "Kernel Same-page Merging daemon — deduplicates identical pages across processes (mostly useful for KVM hosts).", "source": "curated"},
-    "khugepaged": {"description": "Transparent Huge Pages daemon — opportunistically collapses 4K pages into 2M hugepages in the background.", "source": "curated"},
-    "khungtaskd": {"description": "Kernel hung-task detector — fires a warning (or panic) when a task stays in uninterruptible sleep too long.", "source": "curated"},
-    "kauditd": {"description": "Kernel-side audit message broker — relays audit records from the kernel netlink socket to userspace auditd.", "source": "curated"},
-    "kdevtmpfs": {"description": "Kernel devtmpfs helper — creates /dev nodes from device-add events before udev takes over.", "source": "curated"},
-    "watchdogd": {"description": "Kernel watchdog daemon — pets the hardware/software watchdog timer so the system doesn't auto-reset.", "source": "curated"},
-    "oom_reaper": {"description": "Out-of-memory reaper — asynchronously reclaims memory from a process the OOM killer just terminated, so the kernel doesn't have to wait for natural exit.", "source": "curated"},
-    "pool_workqueue_release": {"description": "Releases unused per-CPU workqueue pools when the kernel decides they aren't needed anymore.", "source": "curated"},
-    "gvfsd": {"description": "Master GNOME VFS daemon — the parent process under which the gvfsd-* protocol backends are spawned on demand.", "source": "curated"}
-  }
+    "(sd-pam)": {
+      "description": "Helper thread of 'systemd --user' that holds the PAM session open for your login. Normal; one per user session. Killing it logs you out.",
+      "source": "curated"
+    },
+    "ModemManager": {
+      "description": "Manages mobile broadband modems (USB dongles, embedded WWAN). Idle on systems without one but loaded by default.",
+      "source": "curated"
+    },
+    "NetworkManager": {
+      "description": "Primary network configuration daemon \u2014 manages wired/wifi/VPN connections via the kernel and wpa_supplicant.",
+      "source": "curated"
+    },
+    "Xvnc": {
+      "description": "TigerVNC X server \u2014 serves an X11 display over the VNC protocol. One per active VNC display (:1, :2, ...).",
+      "source": "curated"
+    },
+    "accounts-daemon": {
+      "description": "AccountsService \u2014 exposes user account metadata (name, picture, last login) over D-Bus to the login screen and session.",
+      "source": "curated"
+    },
+    "agent": {
+      "description": "Generic name \u2014 on this Oracle Linux host it's the main Oracle Cloud Agent binary (under oracle-cloud-agent). Verify via Cmdline / parent chain.",
+      "source": "curated"
+    },
+    "agetty": {
+      "description": "Getty for a virtual console \u2014 runs login prompts on tty1..tty6. One per active VT. Safe to leave alone.",
+      "source": "curated"
+    },
+    "at-spi-bus-laun": {
+      "description": "at-spi-bus-launcher \u2014 starts the accessibility (AT-SPI) D-Bus instance.",
+      "source": "curated"
+    },
+    "at-spi2-registr": {
+      "description": "at-spi2-registryd \u2014 registers accessible apps so screen readers (Orca) can introspect the UI.",
+      "source": "curated"
+    },
+    "atd": {
+      "description": "at(1) daemon \u2014 runs one-shot jobs scheduled with `at`. Idle if you don't use it.",
+      "source": "curated"
+    },
+    "auditd": {
+      "description": "Linux audit daemon \u2014 receives audit events from the kernel and writes them to /var/log/audit. Required by SELinux/audit rules.",
+      "source": "curated"
+    },
+    "avahi-daemon": {
+      "description": "Zeroconf / mDNS / DNS-SD \u2014 advertises and discovers services (printers, file shares) on the local network.",
+      "source": "curated"
+    },
+    "bash": {
+      "description": "GNU Bash shell. Interactive instances belong to MINE; long-running ones with no TTY are usually wrappers around a backgrounded command (check Cmdline).",
+      "source": "curated"
+    },
+    "catatonit": {
+      "description": "Tiny init process used as PID 1 inside Podman containers \u2014 reaps zombies and forwards signals. Seeing it on the host means you're looking through into a container's process tree.",
+      "source": "curated"
+    },
+    "chronyd": {
+      "description": "NTP time-sync daemon (chrony). Usually replaces ntpd on modern RHEL/Oracle Linux. Should report tiny drift.",
+      "source": "curated"
+    },
+    "claude": {
+      "description": "Claude Code CLI \u2014 Anthropic's terminal coding assistant.",
+      "source": "curated"
+    },
+    "colord": {
+      "description": "Color management daemon \u2014 stores ICC profiles for monitors/printers and serves them to apps.",
+      "source": "curated"
+    },
+    "conmon": {
+      "description": "Container monitor (Podman/CRI-O). Supervises one container's main process: reaps it, pipes stdout/stderr, and exposes an attach socket. One per running container.",
+      "source": "curated"
+    },
+    "crond": {
+      "description": "cron \u2014 runs scheduled jobs from /etc/cron* and per-user crontabs.",
+      "source": "curated"
+    },
+    "cupsd": {
+      "description": "CUPS \u2014 the system print server. Holds the printer list and the print spooler.",
+      "source": "curated"
+    },
+    "dbus-broker": {
+      "description": "High-performance D-Bus message broker (replaces the older dbus-daemon). One instance for the system bus and one per user session.",
+      "source": "curated"
+    },
+    "dbus-broker-lau": {
+      "description": "dbus-broker-launch \u2014 sets up the bus environment and launches dbus-broker. Sits as the broker's parent.",
+      "source": "curated"
+    },
+    "dconf-service": {
+      "description": "dconf backend \u2014 serves GNOME's binary settings database. Activated on first read; should be cheap.",
+      "source": "curated"
+    },
+    "dtprobed": {
+      "description": "DTrace probe enumeration daemon \u2014 registers USDT probes from running binaries with the DTrace kernel module. Oracle Linux's DTrace stack.",
+      "source": "curated"
+    },
+    "entrypoint": {
+      "description": "Generic name \u2014 a binary the container image declared as ENTRYPOINT. Identify by Cmdline and parent (usually conmon/catatonit).",
+      "source": "curated"
+    },
+    "esbuild": {
+      "description": "Fast JS/TS bundler written in Go. Usually spawned by a Node dev server or bundler (Vite, tsup) as a long-lived child.",
+      "source": "curated"
+    },
+    "falcon-fxpredic": {
+      "description": "CrowdStrike Falcon ML helper (fx-predict) \u2014 runs on-host inference for falcon-sensor's behavioural detections. Comm truncated to 15 chars.",
+      "source": "curated"
+    },
+    "falcon-sensor": {
+      "description": "CrowdStrike Falcon endpoint security agent. Kernel-mode sensor \u2014 ships telemetry to Falcon Cloud and enforces policy. Standard on managed enterprise / Oracle Linux hosts.",
+      "source": "curated"
+    },
+    "falcon-sensor-b": {
+      "description": "CrowdStrike Falcon sensor BPF helper \u2014 falcon-sensor-bpf, used for kernel-level event collection via eBPF.",
+      "source": "curated"
+    },
+    "falcond": {
+      "description": "CrowdStrike Falcon EDR sensor \u2014 endpoint detection & response agent. Sends telemetry to CrowdStrike cloud and applies prevention policy.",
+      "source": "curated"
+    },
+    "fams_executor": {
+      "description": null,
+      "first_seen": "2026-04-29",
+      "source": "auto"
+    },
+    "firefox": {
+      "description": "Firefox browser main process. Sandbox children (Web Content, Socket Process, RDD Process, Utility Process, ...) appear under it in tree mode.",
+      "source": "curated"
+    },
+    "firewalld": {
+      "description": "Dynamic firewall daemon \u2014 manages nftables/iptables rules with zones. The standard firewall on RHEL/Oracle Linux.",
+      "source": "curated"
+    },
+    "flatpak-session": {
+      "description": "flatpak-session-helper \u2014 runs autostart hooks and exposes host capabilities to Flatpak apps in your session.",
+      "source": "curated"
+    },
+    "fluentd": {
+      "description": "Open-source log collector / forwarder. Tails files or sockets and ships log records to backends. On Oracle Linux often part of the OCI Logging Analytics agent.",
+      "source": "curated"
+    },
+    "fusermount": {
+      "description": "Helper that mounts FUSE filesystems on behalf of unprivileged users. Brief invocation; long-lived ones are unusual.",
+      "source": "curated"
+    },
+    "fusermount3": {
+      "description": "FUSE mount helper (FUSE 3 variant). Same role as fusermount.",
+      "source": "curated"
+    },
+    "fwupd": {
+      "description": "Firmware update daemon (LVFS). Discovers BIOS/SSD/NIC firmware updates and stages them; activated on demand by GNOME Software / fwupdmgr.",
+      "source": "curated"
+    },
+    "gedit": {
+      "description": "GNOME text editor.",
+      "source": "curated"
+    },
+    "gjs": {
+      "description": "GNOME JavaScript runtime (SpiderMonkey). Used by GNOME Shell extensions and some desktop tools.",
+      "source": "curated"
+    },
+    "gnome-keyring-d": {
+      "description": "gnome-keyring-daemon \u2014 stores passwords, SSH keys, and PKCS#11 secrets, unlocked by your login.",
+      "source": "curated"
+    },
+    "gnome-screensho": {
+      "description": "GNOME Screenshot tool (gnome-screenshot) \u2014 invoked when the user takes a screenshot. Transient. Comm truncated to 15 chars.",
+      "source": "curated"
+    },
+    "gnome-session-b": {
+      "description": "gnome-session-binary \u2014 orchestrates startup of all GNOME components (shell, panels, daemons) for a login session.",
+      "source": "curated"
+    },
+    "gnome-session-c": {
+      "description": "gnome-session-ctl / -checkpoint \u2014 helper invoked by gnome-session-binary at session boundaries.",
+      "source": "curated"
+    },
+    "gnome-shell": {
+      "description": "GNOME Shell \u2014 the desktop's window manager + UI, written as a Mutter plugin. CPU/RAM hog if extensions misbehave.",
+      "source": "curated"
+    },
+    "gnome-shell-cal": {
+      "description": "gnome-shell-calendar-server \u2014 fetches calendar events from Evolution data server for the shell's clock/calendar widget.",
+      "source": "curated"
+    },
+    "gnome-software": {
+      "description": "GNOME Software \u2014 the GUI app store/updater. Usually idle but periodically wakes to refresh package metadata.",
+      "source": "curated"
+    },
+    "gnome-terminal-": {
+      "description": "gnome-terminal-server \u2014 a single process backs all gnome-terminal windows/tabs in your session.",
+      "source": "curated"
+    },
+    "goa-daemon": {
+      "description": "GNOME Online Accounts \u2014 central D-Bus service holding credentials for accounts (Google, Nextcloud, IMAP) shared across GNOME apps.",
+      "source": "curated"
+    },
+    "goa-identity-se": {
+      "description": "goa-identity-service \u2014 companion to goa-daemon, manages enterprise identities (Kerberos / IPA).",
+      "source": "curated"
+    },
+    "gomon": {
+      "description": "Oracle Cloud Agent's Go-based monitoring binary, harvesting host metrics for the OCI Monitoring service.",
+      "source": "curated"
+    },
+    "gssproxy": {
+      "description": "GSSAPI proxy \u2014 performs Kerberos credential operations on behalf of services like NFS, isolating keytabs.",
+      "source": "curated"
+    },
+    "gvfsd": {
+      "description": "Master GNOME VFS daemon \u2014 the parent process under which the gvfsd-* protocol backends are spawned on demand.",
+      "source": "curated"
+    },
+    "ibus-daemon": {
+      "description": "IBus bus daemon \u2014 coordinates input-method engines and x11/portal bridges.",
+      "source": "curated"
+    },
+    "ibus-dconf": {
+      "description": "ibus-dconf \u2014 exposes IBus settings stored in dconf.",
+      "source": "curated"
+    },
+    "ibus-engine-sim": {
+      "description": "ibus-engine-simple \u2014 fallback IBus engine that handles compose-key sequences.",
+      "source": "curated"
+    },
+    "ibus-extension-": {
+      "description": "ibus-extension-gtk3 \u2014 GTK3 helper that handles IBus preedit popups and language switchers.",
+      "source": "curated"
+    },
+    "ibus-portal": {
+      "description": "ibus-portal \u2014 D-Bus portal so sandboxed (Flatpak) apps can use IBus.",
+      "source": "curated"
+    },
+    "ibus-x11": {
+      "description": "ibus-x11 \u2014 bridges IBus to X11 client apps that don't speak the IBus protocol natively.",
+      "source": "curated"
+    },
+    "irqbalance": {
+      "description": "Distributes hardware interrupt affinity across CPUs to spread load. Adjusts /proc/irq/*/smp_affinity over time.",
+      "source": "curated"
+    },
+    "iscsid": {
+      "description": "open-iscsi initiator daemon \u2014 maintains iSCSI sessions to remote storage targets.",
+      "source": "curated"
+    },
+    "kauditd": {
+      "description": "Kernel-side audit message broker \u2014 relays audit records from the kernel netlink socket to userspace auditd.",
+      "source": "curated"
+    },
+    "kcompactd0": {
+      "description": "Kernel memory compaction daemon \u2014 defragments physical memory so larger contiguous allocations succeed.",
+      "source": "curated"
+    },
+    "kdevtmpfs": {
+      "description": "Kernel devtmpfs helper \u2014 creates /dev nodes from device-add events before udev takes over.",
+      "source": "curated"
+    },
+    "khugepaged": {
+      "description": "Transparent Huge Pages daemon \u2014 opportunistically collapses 4K pages into 2M hugepages in the background.",
+      "source": "curated"
+    },
+    "khungtaskd": {
+      "description": "Kernel hung-task detector \u2014 fires a warning (or panic) when a task stays in uninterruptible sleep too long.",
+      "source": "curated"
+    },
+    "ksmd": {
+      "description": "Kernel Same-page Merging daemon \u2014 deduplicates identical pages across processes (mostly useful for KVM hosts).",
+      "source": "curated"
+    },
+    "ksplice": {
+      "description": "Oracle Ksplice live patching agent \u2014 applies kernel and userspace security fixes without reboot. Default on Oracle Linux.",
+      "source": "curated"
+    },
+    "kswapd0": {
+      "description": "Kernel swap daemon \u2014 pages anonymous memory out to swap when free memory falls below a watermark. One per NUMA node.",
+      "source": "curated"
+    },
+    "kthreadd": {
+      "description": "Kernel thread daemon (PID 2) \u2014 parent of every kernel thread. The kernel asks it to spawn new threads.",
+      "source": "curated"
+    },
+    "lsmd": {
+      "description": "libstoragemgmt daemon \u2014 vendor-neutral API for managing storage arrays (HBAs, SAN). Idle unless lsmcli is used.",
+      "source": "curated"
+    },
+    "nautilus": {
+      "description": "GNOME Files \u2014 the desktop file manager. Also draws the desktop icons in older configurations.",
+      "source": "curated"
+    },
+    "nm-dispatcher": {
+      "description": "NetworkManager dispatcher \u2014 runs hook scripts in /etc/NetworkManager/dispatcher.d on connection events. Mostly idle.",
+      "source": "curated"
+    },
+    "node": {
+      "description": "Node.js runtime. Inspect Cmdline for the entry script (could be a dev server, electron app helper, language server, etc.).",
+      "source": "curated"
+    },
+    "oci-falcon": {
+      "description": "Oracle Cloud Infrastructure agent plugin \u2014 Falcon, gathers compute metrics for the OCI Monitoring service. Part of oracle-cloud-agent.",
+      "source": "curated"
+    },
+    "oci-fams": {
+      "description": "Oracle Cloud Infrastructure agent plugin \u2014 FAMS (Fleet Application Management Service) for patching and lifecycle ops.",
+      "source": "curated"
+    },
+    "oci-wlp": {
+      "description": "Oracle Cloud Infrastructure agent plugin \u2014 WLP (WebLogic Plugin) integration; only relevant if you use Oracle WebLogic on this host.",
+      "source": "curated"
+    },
+    "ollama": {
+      "description": "Local LLM runtime \u2014 serves models like Llama / Mistral over an HTTP API on localhost:11434.",
+      "source": "curated"
+    },
+    "oom_reaper": {
+      "description": "Out-of-memory reaper \u2014 asynchronously reclaims memory from a process the OOM killer just terminated, so the kernel doesn't have to wait for natural exit.",
+      "source": "curated"
+    },
+    "osqueryd": {
+      "description": "osquery daemon (Meta open-source) \u2014 exposes OS state as SQL tables and runs scheduled queries. Often deployed for fleet visibility / EDR.",
+      "source": "curated"
+    },
+    "p11-kit-server": {
+      "description": "PKCS#11 (smart card / HSM) bus server \u2014 lets multiple apps share access to crypto tokens.",
+      "source": "curated"
+    },
+    "packagekitd": {
+      "description": "PackageKit daemon \u2014 distro-agnostic D-Bus API for software install/update/query. GNOME Software talks to this rather than dnf directly.",
+      "source": "curated"
+    },
+    "pipewire": {
+      "description": "Modern audio/video routing daemon. Replaces PulseAudio + JACK; one per user.",
+      "source": "curated"
+    },
+    "pipewire-pulse": {
+      "description": "PulseAudio compatibility layer for PipeWire \u2014 speaks the PA protocol so legacy apps still work.",
+      "source": "curated"
+    },
+    "pmcd": {
+      "description": "Performance Co-Pilot collector daemon \u2014 runs PMDAs and exposes metrics over the network for pmlogger / pmie / pminfo.",
+      "source": "curated"
+    },
+    "pmie": {
+      "description": "Performance Co-Pilot inference engine \u2014 evaluates rule-based alerts over PCP metrics.",
+      "source": "curated"
+    },
+    "pmlogger": {
+      "description": "Performance Co-Pilot metric logger \u2014 periodically samples PCP metrics into archive files for later replay.",
+      "source": "curated"
+    },
+    "pmlogger_check": {
+      "description": "Performance Co-Pilot helper \u2014 periodic health check on pmlogger archive recording. Run from cron / systemd timer.",
+      "source": "curated"
+    },
+    "pmlogger_daily": {
+      "description": "Performance Co-Pilot helper \u2014 daily roll-over of pmlogger archives (rotates and compresses yesterday's metrics).",
+      "source": "curated"
+    },
+    "pmlogger_janito": {
+      "description": "Performance Co-Pilot pmlogger_janitor \u2014 prunes old pmlogger archives per retention policy. Comm truncated to 15 chars.",
+      "source": "curated"
+    },
+    "pmpause": {
+      "description": "PCP archive helper \u2014 invoked by pmlogger to atomically pause/rotate archives.",
+      "source": "curated"
+    },
+    "polkitd": {
+      "description": "PolicyKit daemon \u2014 gatekeeper for privileged operations requested over D-Bus (e.g. systemctl, GNOME settings). Decides whether to prompt for auth.",
+      "source": "curated"
+    },
+    "pool_workqueue_release": {
+      "description": "Releases unused per-CPU workqueue pools when the kernel decides they aren't needed anymore.",
+      "source": "curated"
+    },
+    "postmaster": {
+      "description": "PostgreSQL primary server process. Each per-connection backend is a child of postmaster. Multiple postmasters means multiple PG clusters.",
+      "source": "curated"
+    },
+    "python3": {
+      "description": "CPython 3 interpreter. The PID alone doesn't tell you what it's doing \u2014 check Cmdline for the script being run.",
+      "source": "curated"
+    },
+    "rpcbind": {
+      "description": "RPC port mapper. Tells RPC clients (notably NFS) what port a given RPC program is listening on. Only useful if you use NFS / NIS.",
+      "source": "curated"
+    },
+    "rsyslogd": {
+      "description": "Classic syslog daemon. On systemd systems often coexists with journald, taking input from /dev/log or imjournal.",
+      "source": "curated"
+    },
+    "rtkit-daemon": {
+      "description": "RealtimeKit \u2014 grants real-time scheduling to client processes (PipeWire, PulseAudio) under policy limits.",
+      "source": "curated"
+    },
+    "ruby": {
+      "description": "Ruby interpreter \u2014 check Cmdline for the actual script. On this system frequently used by Performance Co-Pilot's pmrep tooling.",
+      "source": "curated"
+    },
+    "runcommand": {
+      "description": "Oracle Cloud Agent plugin that executes commands sent through OCI Run Command. Idle until a job arrives.",
+      "source": "curated"
+    },
+    "sedispatch": {
+      "description": "SELinux audit-dispatch \u2014 forwards SELinux AVC denials from auditd to setroubleshoot for human-readable analysis.",
+      "source": "curated"
+    },
+    "sleep": {
+      "description": "/usr/bin/sleep \u2014 pauses for N seconds. If long-lived and detached, it's almost always part of a shell loop or a 'wait' in a script.",
+      "source": "curated"
+    },
+    "ssh-agent": {
+      "description": "Caches your decrypted SSH private keys for the session, so you aren't prompted for the passphrase on every git/ssh.",
+      "source": "curated"
+    },
+    "sshd": {
+      "description": "OpenSSH daemon. The system-level instance listens for incoming SSH; a per-connection child handles each session and is owned by the connecting user.",
+      "source": "curated"
+    },
+    "sssd_kcm": {
+      "description": "SSSD's Kerberos Credential Manager \u2014 stores Kerberos tickets in a centralized cache instead of per-process files.",
+      "source": "curated"
+    },
+    "sudo": {
+      "description": "sudo \u2014 running an authorized command as another user (usually root). The Cmdline reveals what's actually being executed.",
+      "source": "curated"
+    },
+    "systemd": {
+      "description": "PID 1 init system; manages services, mounts, sockets, login sessions, and the boot/shutdown lifecycle. Also runs as 'systemd --user' for per-user service management.",
+      "source": "curated"
+    },
+    "systemd-hostnam": {
+      "description": "systemd-hostnamed \u2014 D-Bus service that exposes/changes the hostname. Activated on demand; should be idle.",
+      "source": "curated"
+    },
+    "systemd-journal": {
+      "description": "systemd-journald \u2014 collects logs from the kernel, syslog, and all services into the structured systemd journal. Read with journalctl.",
+      "source": "curated"
+    },
+    "systemd-logind": {
+      "description": "Tracks user logins and seats; manages session lifecycles, idle/lock state, and inhibitor locks (e.g. 'don't suspend during update').",
+      "source": "curated"
+    },
+    "systemd-timedat": {
+      "description": "systemd-timedated \u2014 D-Bus interface for time/date settings (timezone, RTC mode). Started on demand by timedatectl. Comm truncated to 15 chars.",
+      "source": "curated"
+    },
+    "systemd-udevd": {
+      "description": "Device manager \u2014 listens for kernel uevents and applies udev rules to create /dev nodes, set perms, load firmware, and run device-add hooks.",
+      "source": "curated"
+    },
+    "tuned": {
+      "description": "Dynamic system tuning daemon \u2014 applies a profile (throughput-performance, balanced, latency-performance) that adjusts CPU/IO/network knobs.",
+      "source": "curated"
+    },
+    "tuned-ppd": {
+      "description": "tuned's power-profiles-daemon shim \u2014 exposes a power-profiles-daemon-compatible D-Bus API on top of tuned.",
+      "source": "curated"
+    },
+    "udisksd": {
+      "description": "Storage device management over D-Bus \u2014 mount/unmount/format removable disks, manage partitions. Backs file-manager mount actions.",
+      "source": "curated"
+    },
+    "unifiedmonitori": {
+      "description": "unifiedmonitoringagent \u2014 Oracle's unified monitoring agent (often Fluentd-based) that ships logs and metrics from this host to OCI services.",
+      "source": "curated"
+    },
+    "updater": {
+      "description": "Oracle Cloud Agent self-updater \u2014 checks for and applies new agent versions.",
+      "source": "curated"
+    },
+    "upowerd": {
+      "description": "Power and battery info via D-Bus. Feeds laptop battery indicators and triggers low-power events.",
+      "source": "curated"
+    },
+    "vncsession": {
+      "description": "TigerVNC vncsession \u2014 launched by the vncserver@ systemd unit; sets up the user environment and execs Xvnc for that display.",
+      "source": "curated"
+    },
+    "watchdogd": {
+      "description": "Kernel watchdog daemon \u2014 pets the hardware/software watchdog timer so the system doesn't auto-reset.",
+      "source": "curated"
+    },
+    "wireplumber": {
+      "description": "PipeWire session and policy manager \u2014 decides routing, default sinks, device priorities.",
+      "source": "curated"
+    },
+    "wlp-agent.ext": {
+      "description": "Oracle Cloud Agent's WebLogic plugin extension binary, spawned by oci-wlp.",
+      "source": "curated"
+    },
+    "wpa_supplicant": {
+      "description": "Implements WPA/WPA2/WPA3 authentication for wifi (and sometimes wired 802.1X). Driven by NetworkManager.",
+      "source": "curated"
+    },
+    "xdg-desktop-por": {
+      "description": "xdg-desktop-portal \u2014 main XDG portal: file chooser, screenshot, notification, etc., on behalf of sandboxed apps. Backends (-gnome, -gtk) implement the UI.",
+      "source": "curated"
+    },
+    "xdg-document-po": {
+      "description": "xdg-document-portal \u2014 exposes a per-app FUSE mount in /run/user/UID/doc so sandboxed apps can access user-selected files without filesystem access.",
+      "source": "curated"
+    },
+    "xdg-permission-": {
+      "description": "xdg-permission-store \u2014 persists per-app permission decisions (\"always allow camera for X\") for the portals.",
+      "source": "curated"
+    },
+    "xinit": {
+      "description": "Starts an X server and a single client (typically a session manager). Used here to bring up the GNOME session inside the VNC X server.",
+      "source": "curated"
+    }
+  },
+  "patterns": [
+    {
+      "description": "Kernel workqueue thread \u2014 runs deferred work for some kernel subsystem (the suffix names it: e.g. -events, -xfs-sync, -kblockd). Created and destroyed by the kernel as needed; presence is normal.",
+      "glob": "kworker/*"
+    },
+    {
+      "description": "Per-CPU softirq handler. Runs network/timer/RCU softirqs that overflowed the interrupt context. One per CPU. Heavy CPU here means the system is taking a lot of soft interrupts.",
+      "glob": "ksoftirqd/*"
+    },
+    {
+      "description": "Per-CPU stop-machine helper used to migrate tasks between CPUs and run synchronization fences. One per CPU. Should sit at 0% almost always.",
+      "glob": "migration/*"
+    },
+    {
+      "description": "Per-CPU CPU hot-plug coordinator. Drives the bring-up and tear-down of a logical CPU. Idle on stable systems.",
+      "glob": "cpuhp/*"
+    },
+    {
+      "description": "Per-CPU idle-injection thread. Used by thermal throttling to force CPUs idle when they get too hot.",
+      "glob": "idle_inject/*"
+    },
+    {
+      "description": "Threaded interrupt handler \u2014 the kernel runs the bottom half of an IRQ in this thread. Suffix names the device or driver (e.g. irq/9-acpi, irq/24-aerdrv for PCIe AER).",
+      "glob": "irq/*"
+    },
+    {
+      "description": "Read-Copy-Update machinery. Reclaims memory freed by RCU readers. Multiple variants exist (preempt, tasks, exp_gp, ...). Idle most of the time; load here usually means heavy RCU usage in some subsystem.",
+      "glob": "rcu_*"
+    },
+    {
+      "description": "Per-SCSI-host error handler thread. Sits idle until a command times out or fails; activity here usually means a flaky disk.",
+      "glob": "scsi_eh_*"
+    },
+    {
+      "description": "XFS Active Item List Daemon \u2014 flushes XFS journal items to disk for the named device. One per mounted XFS filesystem.",
+      "glob": "xfsaild/*"
+    },
+    {
+      "description": "Journaling Block Device v2 \u2014 handles ext4 (and ocfs2) journal commits for the named device.",
+      "glob": "jbd2/*"
+    },
+    {
+      "description": "Broadcom NetXtreme II iSCSI offload helper thread. Only relevant on systems using bnx2i hardware iSCSI; otherwise idle.",
+      "glob": "bnx2i_thread/*"
+    },
+    {
+      "description": "GNOME Settings Daemon helper. Each gsd-* binary handles one slice of desktop configuration (color, power, keyboard, media-keys, etc.). Started by the user's GNOME session.",
+      "glob": "gsd-*"
+    },
+    {
+      "description": "GNOME Virtual Filesystem backend. Implements pseudo-filesystems exposed to apps over D-Bus (network shares, trash, metadata, dnssd, etc.).",
+      "glob": "gvfsd-*"
+    },
+    {
+      "description": "GNOME VFS volume monitor \u2014 watches a class of removable/online storage (udisks2, mtp, gphoto2, goa) and surfaces it to the file manager.",
+      "glob": "gvfs-*"
+    },
+    {
+      "description": "IBus input method framework. Handles non-Latin / CJK / IME text input; ibus-daemon orchestrates engines (ibus-engine-*) and the X11/portal bridges.",
+      "glob": "ibus-*"
+    },
+    {
+      "description": "XDG desktop portal \u2014 D-Bus interface that lets sandboxed apps (Flatpak, Snap) request host capabilities (file access, screenshots, notifications) under user consent.",
+      "glob": "xdg-*"
+    },
+    {
+      "description": "GNOME Evolution data server component. Backs calendars, address books, alarms, and account sources for Evolution and any GNOME app that consumes them.",
+      "glob": "evolution-*"
+    },
+    {
+      "description": "Performance Co-Pilot Metric Domain Agent. Each pmda* exports metrics from one subsystem (linux, kvm, xfs, proc, root, dm) to pmcd for collection.",
+      "glob": "pmda*"
+    }
+  ],
+  "version": 1
 }

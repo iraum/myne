@@ -149,6 +149,17 @@ def read_wchan(pid):
 
 SHELL_COMMS = {'bash', 'zsh', 'sh', 'fish', 'dash', 'ksh', 'tcsh', 'csh', 'mksh'}
 
+# Comms whose presence is uninformative in a process viewer. Transient shell
+# utilities (sed, tail, ...) and Firefox's prctl-set sub-process thread names
+# get observed briefly, then auto-stubbed forever. Skip them in record() so
+# library.json doesn't grow with descriptions no one will ever write.
+STUB_DENYLIST = frozenset({
+    'sed', 'tail', 'xargs', 'xz', 'sh', 'dnf', 'rpm', 'systemctl',
+    'restorecon', 'python3.11',
+    'Web Content', 'Socket Process', 'RDD Process', 'Isolated Web Co',
+    'Privileged Cont', 'Utility Process', 'WebExtensions',
+})
+
 UNIT_SUFFIXES = ('.service', '.scope', '.socket', '.target', '.timer', '.path', '.mount')
 
 # Unit names that always carry zero signal: gnome-terminal tab scopes,
@@ -467,6 +478,8 @@ class Library:
 
     def record(self, comm):
         if comm in self.entries:
+            return
+        if comm in STUB_DENYLIST or comm.startswith('npm '):
             return
         for p in self.patterns:
             if fnmatch.fnmatchcase(comm, p.get('glob', '')):
