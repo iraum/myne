@@ -73,7 +73,7 @@ The detail panel shows all that apply, not just the winning one.
 - **`entries`** — exact-match by `comm` (the 15-char-truncated name from `/proc/<pid>/stat`).
 - **`patterns`** — fnmatch globs evaluated in file order; first match wins. Used for families like `kworker/*`, `gsd-*`, `gvfsd-*`.
 
-Lookup tries `entries` first, then `patterns`. Any `comm` seen at runtime that has no curated entry and no pattern match gets auto-stubbed (`description: null, source: "auto", first_seen: <date>`) and the file is rewritten on exit. Stubs are how we keep a record of "what we've seen but haven't documented" — future curation work is `grep '"description": null' library.json`, research, fill in, set `"source": "curated"`.
+Lookup tries `entries` first, then `patterns`. Any `comm` seen at runtime that has no curated entry, no pattern match, and isn't in `STUB_DENYLIST` (transient shell utilities and Firefox sub-process thread names — see `Library.record`) gets auto-stubbed (`description: null, source: "auto", first_seen: <date>`) and the file is rewritten on exit. Stubs are how we keep a record of "what we've seen but haven't documented" — future curation work is `grep '"description": null' library.json`, research, fill in, set `"source": "curated"`.
 
 When matching, remember `comm` is truncated to 15 chars in `/proc/<pid>/stat`. So the key for `gnome-session-binary` is `gnome-session-b`, not the full name.
 
