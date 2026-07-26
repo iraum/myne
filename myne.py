@@ -518,6 +518,9 @@ def setup_colors():
         i += 1
     curses.init_pair(i, curses.COLOR_BLACK, curses.COLOR_WHITE)
     CAT_COLOR_PAIR['_HEADER'] = curses.color_pair(i) | curses.A_BOLD
+    i += 1
+    curses.init_pair(i, curses.COLOR_RED, bg)
+    CAT_COLOR_PAIR['_DYING'] = curses.color_pair(i)
 
 
 class App:
@@ -542,6 +545,7 @@ class App:
         self.ghosts = {}
         self.ghost_ttl = 5.0
         self.fresh_ttl = 3.0
+        self.dying_ttl = 1.0
         self.hide_kernel = True
 
     def set_message(self, msg, dur=3.0):
@@ -704,7 +708,11 @@ class App:
         line = line.ljust(w)[:w]
         attr = CAT_COLOR_PAIR.get(p['category'], 0)
         if p.get('_ghost'):
-            attr |= curses.A_DIM
+            # Just-died: flash red+bold for dying_ttl, then fade to dim until ghost_ttl.
+            if time.time() - p.get('_ghost_at', 0) < self.dying_ttl:
+                attr = CAT_COLOR_PAIR['_DYING'] | curses.A_BOLD
+            else:
+                attr |= curses.A_DIM
         elif p.get('_fresh'):
             attr |= curses.A_BOLD
         if selected:

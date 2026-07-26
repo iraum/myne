@@ -90,11 +90,13 @@ If you change the navigation handlers, go through `_move(delta)` / `_jump('home'
 Process churn is otherwise invisible between refreshes. The App keeps two pieces of state alongside `self.procs`:
 
 - `first_seen[pid]` — set on first sighting, used to render a bold `+` marker for `fresh_ttl` seconds (default 3.0).
-- `ghosts[pid]` — a snapshot of processes that vanished since the last refresh, drawn dim with a `†` prefix and kept for `ghost_ttl` seconds (default 5.0).
+- `ghosts[pid]` — a snapshot of processes that vanished since the last refresh, kept for `ghost_ttl` seconds (default 5.0) and drawn with a `†` prefix in two stages: red + bold (the `_DYING` pair) for the first `dying_ttl` seconds (default 1.0), then dim for the rest. Timed from `_ghost_at`, stamped at the refresh that noticed the death — so the flash is anchored to detection, not to the actual exit.
 
 On the **very first refresh** (`is_first = not self.first_seen`), every PID's `first_seen` is back-dated past `fresh_ttl` so existing processes don't all flash as new — only genuinely new ones do. Preserve that guard if you change the priming step.
 
 Ghosts are merged into the filtered list *after* live processes, so they participate in category and text filters but are skipped in tree mode (parent links may be stale). Their cpu/mem values are frozen at last-sample time.
+
+The dying flash is only visible because `draw()` runs on every loop iteration and `stdscr.timeout(500)` caps the idle gap at 500 ms — comfortably under `dying_ttl`. Raising that timeout above `dying_ttl` would silently drop the flash on idle frames.
 
 ## Conventions
 
