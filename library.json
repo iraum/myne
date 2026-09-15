@@ -189,6 +189,11 @@
       "description": "GNOME Software \u2014 the GUI app store/updater. Usually idle but periodically wakes to refresh package metadata.",
       "source": "curated"
     },
+    "gnome-system-mo": {
+      "description": null,
+      "first_seen": "2026-09-01",
+      "source": "auto"
+    },
     "gnome-terminal-": {
       "description": "gnome-terminal-server \u2014 a single process backs all gnome-terminal windows/tabs in your session.",
       "source": "curated"
@@ -329,6 +334,11 @@
       "description": "PackageKit daemon \u2014 distro-agnostic D-Bus API for software install/update/query. GNOME Software talks to this rather than dnf directly.",
       "source": "curated"
     },
+    "ping": {
+      "description": null,
+      "first_seen": "2026-09-01",
+      "source": "auto"
+    },
     "pipewire": {
       "description": "Modern audio/video routing daemon. Replaces PulseAudio + JACK; one per user.",
       "source": "curated"
@@ -409,6 +419,26 @@
       "description": "/usr/bin/sleep \u2014 pauses for N seconds. If long-lived and detached, it's almost always part of a shell loop or a 'wait' in a script.",
       "source": "curated"
     },
+    "spielraum_clock": {
+      "description": null,
+      "first_seen": "2026-09-01",
+      "source": "auto"
+    },
+    "spielraum_deskt": {
+      "description": null,
+      "first_seen": "2026-09-01",
+      "source": "auto"
+    },
+    "spielraum_launc": {
+      "description": null,
+      "first_seen": "2026-09-01",
+      "source": "auto"
+    },
+    "spielraum_term": {
+      "description": null,
+      "first_seen": "2026-09-01",
+      "source": "auto"
+    },
     "ssh-agent": {
       "description": "Caches your decrypted SSH private keys for the session, so you aren't prompted for the passphrase on every git/ssh.",
       "source": "curated"
@@ -416,6 +446,11 @@
     "sshd": {
       "description": "OpenSSH daemon. The system-level instance listens for incoming SSH; a per-connection child handles each session and is owned by the connecting user.",
       "source": "curated"
+    },
+    "sshd-session": {
+      "description": null,
+      "first_seen": "2026-09-01",
+      "source": "auto"
     },
     "sssd_kcm": {
       "description": "SSSD's Kerberos Credential Manager \u2014 stores Kerberos tickets in a centralized cache instead of per-process files.",
